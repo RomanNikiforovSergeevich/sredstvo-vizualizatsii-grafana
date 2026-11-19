@@ -1,0 +1,108 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: Node Exporter Alerts
+    folder: Alerting
+    interval: 1m
+    rules:
+      - uid: high-cpu-usage
+        title: High CPU Usage
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{job="nodeexporter", mode="idle"}[5m])) * 100)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: $B > 85
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $values.B }}% (threshold: 85%)"
+        isPaused: false
+
+      - uid: low-memory
+        title: Low Free Memory
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: node_memory_MemFree_bytes{job="nodeexporter"}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: $B < 500 * 1024 * 1024
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low free memory on {{ $labels.instance }}"
+          description: "Free memory is {{ $values.B }} bytes (threshold: 500 MB)"
+        isPaused: false
+
+      - uid: low-disk-space
+        title: Low Disk Space
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: node_filesystem_avail_bytes{job="nodeexporter", fstype!~"tmpfs|overlay", mountpoint="/"}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: $B < 5 * 1024 * 1024 * 1024
+        noDataState: NoData
+        execErrState: Alerting
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          description: "Available space is {{ $values.B }} bytes (threshold: 5 GB)"
+        isPaused: false
